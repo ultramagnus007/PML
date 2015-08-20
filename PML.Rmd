@@ -1,0 +1,90 @@
+---
+title: 'Practical Machine Learning Assignment'
+author: 'Author: UltraMagnus'
+output:
+  html_document:
+    keep_md: yes
+    theme: united
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+# Overview
+
+# Loading the Data  
+
+Reading the Data from csv files 'Tdata' contain the traning data and Sdata contains the 20 test case to be submitted.  
+
+```{r}
+dirpath="/home/lotus/Data_Science/08_Practical Machine Learning/GIT/"
+Tdata<-read.table(paste0(dirpath,"pml-training.csv"), header = TRUE, sep = ",")
+Sdata<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, sep = ",")
+```
+
+# Cleaning the Data  
+
+1. Calculating the index of columns which contains the NA values, rmCol contains the 
+index of those columns.
+```{r}
+library(dplyr)
+i<-0
+rmCol<-NULL
+for(i in 1:ncol(Sdata))
+{
+  if(sum(is.na(Sdata[, i]))  > 0)
+		rmCol<-c(rmCol,i)
+}
+```
+
+removing column containing NA values from both 
+
+```{r}
+Tdata<-select(Tdata, -rmCol)
+Sdata<-select(Sdata, -rmCol)
+```
+
+removing unuseful colums  
+```{r}
+Tdata<-select(Tdata, -c(X,user_name, cvtd_timestamp, new_window, num_window))
+Sdata<-select(Sdata, -c(X,user_name, cvtd_timestamp, new_window, num_window))
+dim(Tdata)
+dim(Sdata)
+```
+
+so finally both contains 55 columns  
+
+# Creating Traning and Test Set
+creating the Traning and Test set 70% for Training and 30% for Testing. 
+```{r}
+library(caret)
+set.seed(12321)
+testIndex = createDataPartition(Tdata$classe, p = 0.70,list=FALSE)
+training = Tdata[-testIndex,]
+testing = Tdata[testIndex,]
+```
+
+# Training  
+
+Training the training data using randomForest.  
+
+```{r}
+library(randomForest)
+modFit <- randomForest(classe ~ .,data=training)
+```
+
+
+#Testing 
+Testing the model, 55th column is not used as it is 'problem_id' variable  
+```{r}
+confusionMatrix(testing$classe, predict(modFit,testing[,-55]))
+```
+
+we can see accurary is 99.16% which is quite statisfactory.  so we can use above model for final test cases for submission.  
+
+On 20 Test Cases Results are  
+```{r}
+result<-predict(modFit,Sdata[,-55])
+result
+```
+
+all test cases passed.
