@@ -17,15 +17,19 @@ Reading the Data from csv files 'Tdata' contain the traning data and Sdata conta
 
 ```{r}
 dirpath="/home/lotus/Data_Science/08_Practical Machine Learning/GIT/"
-Tdata<-read.table(paste0(dirpath,"pml-training.csv"), header = TRUE, sep = ",")
-Sdata<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, sep = ",")
+#cells having values "NA" and "" are treated as NA
+NAstrings = c("NA", "")
+Tdata<-read.table(paste0(dirpath,"pml-training.csv"), header = TRUE,
+                  na.strings = NAstrings, sep = ",")
+Sdata<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, 
+                  na.strings = NAstrings, sep = ",")
 ```
 
 # Cleaning the Data  
 
 1. Calculating the index of columns which contains the NA values, rmCol contains the 
 index of those columns.
-```{r}
+```{r  message=FALSE}
 library(dplyr)
 i<-0
 rmCol<-NULL
@@ -55,7 +59,7 @@ so finally both contains 55 columns
 
 # Creating Traning and Test Set
 creating the Traning and Test set 70% for Training and 30% for Testing. 
-```{r}
+```{r  message=FALSE}
 library(caret)
 set.seed(12321)
 testIndex = createDataPartition(Tdata$classe, p = 0.70,list=FALSE)
@@ -63,28 +67,58 @@ training = Tdata[-testIndex,]
 testing = Tdata[testIndex,]
 ```
 
-# Training  
+# Training  and Crossvalidation
 
-Training the training data using randomForest.  
+## setting the parameters
 
+1. setting the 'mtry' parameter (the number of variables randomly-selected to go in each tree).  
+first with mtry=5 and again with mtry= 15
 ```{r}
-library(randomForest)
-modFit <- randomForest(classe ~ .,data=training)
+customGrid <- data.frame(mtry=c(5, 10, 15, 20, 25))
+```
+
+2. setting method = "repeatedcv",  number = 10 and repeats = 10.  
+```{r}
+fitControl <- trainControl(method = "repeatedcv",number = 10,repeats = 10)
 ```
 
 
-#Testing 
-Testing the model, 55th column is not used as it is 'problem_id' variable  
-```{r}
-confusionMatrix(testing$classe, predict(modFit,testing[,-55]))
+3. number of trees grown in each forest 'ntree' is set to 200 because default value is 500 which take too much time.  
+
+## Training using training data by randomForest.  
+It use 10 separate 10-fold cross-validations are used as the resampling scheme on training dataset, caret train function use repeated cross validation to tune the parameter to generate optimal model fit.
+
+```{r cache = TRUE , message=FALSE}
+modFit <- train(classe ~ ., data=training, method="rf",
+  trControl=fitControl, tuneGrid=customGrid, ntree=200)
 ```
 
-we can see accurary is 99.16% which is quite statisfactory.  so we can use above model for final test cases for submission.  
-
-On 20 Test Cases Results are  
+## Accuracy on Training set  
 ```{r}
-result<-predict(modFit,Sdata[,-55])
-result
+modFit$bestTune 
+
+modFit$results$Accuracy
+
+plot(modFit)
 ```
 
-all test cases passed.
+#Testing
+Testing the generated model on left over test data which is not used in training and       
+cross validation.  
+55th column is omitted from predictor as it containes 'classe' variable which is to be predicted. 
+```{r}
+predictions<-predict(modFit,testing[,-55])
+```
+
+Creating  the confusion matrix from actual class and predicted classes.
+```{r}
+CM<-confusionMatrix(testing$classe, predictions)
+CM$table
+CM$overall
+```
+
+### out of sample error
+Since this testing data is not used in training or model building (cross validaton). The error estimate on it will be proper estimate of out of sample error.   
+we can see accurary is `r round(CM$overall[1]*100, 2)`% which is quite statisfactory.  
+
+

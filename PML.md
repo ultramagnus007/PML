@@ -9,8 +9,12 @@ Reading the Data from csv files 'Tdata' contain the traning data and Sdata conta
 
 ```r
 dirpath="/home/lotus/Data_Science/08_Practical Machine Learning/GIT/"
-Tdata<-read.table(paste0(dirpath,"pml-training.csv"), header = TRUE, sep = ",")
-Sdata<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, sep = ",")
+#cells having values "NA" and "" are treated as NA
+NAstrings = c("NA", "")
+Tdata<-read.table(paste0(dirpath,"pml-training.csv"), header = TRUE,
+                  na.strings = NAstrings, sep = ",")
+Sdata<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, 
+                  na.strings = NAstrings, sep = ",")
 ```
 
 # Cleaning the Data  
@@ -20,22 +24,6 @@ index of those columns.
 
 ```r
 library(dplyr)
-```
-
-```
-## 
-## Attaching package: 'dplyr'
-## 
-## The following objects are masked from 'package:stats':
-## 
-##     filter, lag
-## 
-## The following objects are masked from 'package:base':
-## 
-##     intersect, setdiff, setequal, union
-```
-
-```r
 i<-0
 rmCol<-NULL
 for(i in 1:ncol(Sdata))
@@ -80,30 +68,77 @@ creating the Traning and Test set 70% for Training and 30% for Testing.
 
 ```r
 library(caret)
-```
-
-```
-## Loading required package: lattice
-## Loading required package: ggplot2
-```
-
-```r
 set.seed(12321)
 testIndex = createDataPartition(Tdata$classe, p = 0.70,list=FALSE)
 training = Tdata[-testIndex,]
 testing = Tdata[testIndex,]
 ```
 
-# Training  
+# Training  and Crossvalidation
 
-Training the training data using randomForest.  
+## setting the parameters
+
+1. setting the 'mtry' parameter (the number of variables randomly-selected to go in each tree).  
+first with mtry=5 and again with mtry= 15
+
+```r
+customGrid <- data.frame(mtry=c(5, 10, 15, 20, 25))
+```
+
+2. setting method = "repeatedcv",  number = 10 and repeats = 10.  
+
+```r
+fitControl <- trainControl(method = "repeatedcv",number = 10,repeats = 10)
+```
+
+
+3. number of trees grown in each forest 'ntree' is set to 200 because default value is 500 which take too much time.  
+
+## Training using training data by randomForest.  
+It use 10 separate 10-fold cross-validations are used as the resampling scheme on training dataset, caret train function use repeated cross validation to tune the parameter to generate optimal model fit.
 
 
 ```r
-library(randomForest)
+modFit <- train(classe ~ ., data=training, method="rf",
+  trControl=fitControl, tuneGrid=customGrid, ntree=200)
+```
+
+## Accuracy on Training set  
+
+```r
+modFit$bestTune 
 ```
 
 ```
+##   mtry
+## 4   20
+```
+
+```r
+modFit$results$Accuracy
+```
+
+```
+## [1] 0.9903655 0.9923539 0.9928807 0.9930673 0.9929996
+```
+
+```r
+plot(modFit)
+```
+
+![](PML_files/figure-html/unnamed-chunk-9-1.png) 
+
+#Testing
+Testing the generated model on left over test data which is not used in training and       
+cross validation.  
+55th column is omitted from predictor as it containes 'classe' variable which is to be predicted. 
+
+```r
+predictions<-predict(modFit,testing[,-55])
+```
+
+```
+## Loading required package: randomForest
 ## randomForest 4.6-10
 ## Type rfNews() to see new features/changes/bug fixes.
 ## 
@@ -114,65 +149,36 @@ library(randomForest)
 ##     combine
 ```
 
-```r
-modFit <- randomForest(classe ~ .,data=training)
-```
-
-
-#Testing 
-Testing the model, 55th column is not used as it is 'problem_id' variable  
+Creating  the confusion matrix from actual class and predicted classes.
 
 ```r
-confusionMatrix(testing$classe, predict(modFit,testing[,-55]))
+CM<-confusionMatrix(testing$classe, predictions)
+CM$table
 ```
 
 ```
-## Confusion Matrix and Statistics
-## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 3904    2    0    0    0
-##          B   22 2636    0    0    0
-##          C    0   32 2362    2    0
-##          D    0    0   37 2211    4
-##          E    0    0    3   14 2508
-## 
-## Overall Statistics
-##                                          
-##                Accuracy : 0.9916         
-##                  95% CI : (0.9899, 0.993)
-##     No Information Rate : 0.2858         
-##     P-Value [Acc > NIR] : < 2.2e-16      
-##                                          
-##                   Kappa : 0.9893         
-##  Mcnemar's Test P-Value : NA             
-## 
-## Statistics by Class:
-## 
-##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9944   0.9873   0.9833   0.9928   0.9984
-## Specificity            0.9998   0.9980   0.9970   0.9964   0.9985
-## Pos Pred Value         0.9995   0.9917   0.9858   0.9818   0.9933
-## Neg Pred Value         0.9978   0.9969   0.9965   0.9986   0.9996
-## Prevalence             0.2858   0.1944   0.1749   0.1621   0.1829
-## Detection Rate         0.2842   0.1919   0.1719   0.1610   0.1826
-## Detection Prevalence   0.2843   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      0.9971   0.9926   0.9902   0.9946   0.9984
+##          A 3901    4    0    1    0
+##          B   26 2632    0    0    0
+##          C    0   23 2369    4    0
+##          D    0    0   32 2217    3
+##          E    0    0    3   12 2510
 ```
-
-we can see accurary is 99.16% which is quite statisfactory.  so we can use above model for final test cases for submission.  
-
-On 20 Test Cases Results are  
 
 ```r
-result<-predict(modFit,Sdata[,-55])
-result
+CM$overall
 ```
 
 ```
-##  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-##  B  A  B  A  A  E  D  B  A  A  B  C  B  A  E  E  A  B  B  B 
-## Levels: A B C D E
+##       Accuracy          Kappa  AccuracyLower  AccuracyUpper   AccuracyNull 
+##      0.9921380      0.9900538      0.9905157      0.9935463      0.2858703 
+## AccuracyPValue  McnemarPValue 
+##      0.0000000            NaN
 ```
 
-all test cases passed.
+### out of sample error
+Since this testing data is not used in training or model building (cross validaton). The error estimate on it will be proper estimate of out of sample error.   
+we can see accurary is 99.21% which is quite statisfactory.  
+
+
