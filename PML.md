@@ -6,7 +6,7 @@ We are using Human Activity Recognition data obtained from  [link](http://groupw
 
 # Loading the Data  
 
-Reading the Data from csv files 'Tdata' contain the traning data and Sdata contains the 20 test case to be submitted.  
+Reading the Data from csv files 'Tdata' contain the traning data and 'SubmissionData' contains the 20 test case to be submitted.  
 
 
 ```r
@@ -31,7 +31,7 @@ rmCol<-NULL
 for(i in 1:ncol(SubmissionData))
 {
   if(sum(is.na(SubmissionData[, i]))  > 0)
-		rmCol<-c(rmCol,i)
+  	rmCol<-c(rmCol,i)
 }
 ```
 
