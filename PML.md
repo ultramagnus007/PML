@@ -1,6 +1,8 @@
 # Practical Machine Learning Assignment
 Author: UltraMagnus  
-# Overview
+# Overview  
+
+We are using Human Activity Recognition data obtained from  [link](http://groupware.les.inf.puc-rio.br/har). There are five kind of activities ('A', 'B', 'C', 'D', 'E') and the mesurements are taken from wearable devices attached to body. we will be using the randomforest to predict which activity was performed from the mesurements at specific time.  
 
 # Loading the Data  
 
@@ -13,7 +15,7 @@ dirpath="/home/lotus/Data_Science/08_Practical Machine Learning/GIT/"
 NAstrings = c("NA", "")
 Tdata<-read.table(paste0(dirpath,"pml-training.csv"), header = TRUE,
                   na.strings = NAstrings, sep = ",")
-Sdata<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, 
+SubmissionData<-read.table(paste0(dirpath,"pml-testing.csv"), header = TRUE, 
                   na.strings = NAstrings, sep = ",")
 ```
 
@@ -26,26 +28,27 @@ index of those columns.
 library(dplyr)
 i<-0
 rmCol<-NULL
-for(i in 1:ncol(Sdata))
+for(i in 1:ncol(SubmissionData))
 {
-  if(sum(is.na(Sdata[, i]))  > 0)
-		rmCol<-c(rmCol,i)
+  if(sum(is.na(SubmissionData[, i]))  > 0)
+  	rmCol<-c(rmCol,i)
 }
 ```
 
-removing column containing NA values from both 
+Removing columns containing NA values
 
 
 ```r
 Tdata<-select(Tdata, -rmCol)
-Sdata<-select(Sdata, -rmCol)
+SubmissionData<-select(SubmissionData, -rmCol)
 ```
 
-removing unuseful colums  
+Removing unuseful colums  
 
 ```r
 Tdata<-select(Tdata, -c(X,user_name, cvtd_timestamp, new_window, num_window))
-Sdata<-select(Sdata, -c(X,user_name, cvtd_timestamp, new_window, num_window))
+SubmissionData<-select(SubmissionData, -c(X,user_name, cvtd_timestamp,
+                                          new_window, num_window))
 dim(Tdata)
 ```
 
@@ -54,7 +57,7 @@ dim(Tdata)
 ```
 
 ```r
-dim(Sdata)
+dim(SubmissionData)
 ```
 
 ```
@@ -76,7 +79,7 @@ testing = Tdata[testIndex,]
 
 # Training  and Crossvalidation
 
-## setting the parameters
+## Setting the parameters
 
 1. setting the 'mtry' parameter (the number of variables randomly-selected to go in each tree).  
 first with mtry=5 and again with mtry= 15
@@ -103,7 +106,6 @@ modFit <- train(classe ~ ., data=training, method="rf",
   trControl=fitControl, tuneGrid=customGrid, ntree=200)
 ```
 
-## Accuracy on Training set  
 
 ```r
 modFit$bestTune 
@@ -115,6 +117,17 @@ modFit$bestTune
 ```
 
 ```r
+plot(modFit)
+```
+
+![](PML_files/figure-html/unnamed-chunk-9-1.png) 
+
+After tuning the parameters using crossvalidation, the best accuracy obtained at mtry = 20.  
+
+## Accuracy on Training set  using crossvalidation
+
+
+```r
 modFit$results$Accuracy
 ```
 
@@ -122,11 +135,7 @@ modFit$results$Accuracy
 ## [1] 0.9903655 0.9923539 0.9928807 0.9930673 0.9929996
 ```
 
-```r
-plot(modFit)
-```
-
-![](PML_files/figure-html/unnamed-chunk-9-1.png) 
+The best accuracy obtained using cross validation is 99.31% obtained at mtry = 20.
 
 #Testing
 Testing the generated model on left over test data which is not used in training and       
@@ -177,8 +186,23 @@ CM$overall
 ##      0.0000000            NaN
 ```
 
-### out of sample error
+### Out of sample error
 Since this testing data is not used in training or model building (cross validaton). The error estimate on it will be proper estimate of out of sample error.   
 we can see accurary is 99.21% which is quite statisfactory.  
 
+### On data used for submission  
 
+using randomforest class labels are  
+
+
+```r
+res<-predict(modFit,SubmissionData[,-55])
+res
+```
+
+```
+##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E
+```
+
+Result: All test cases passed.  
